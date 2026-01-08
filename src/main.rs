@@ -3,6 +3,7 @@ use clap::Parser;
 use httpress::cli::Args;
 use httpress::client::HttpClient;
 use httpress::config::BenchConfig;
+use httpress::executor::Executor;
 
 #[tokio::main]
 async fn main() {
@@ -30,16 +31,10 @@ async fn main() {
         }
     };
 
-    // Execute a single test request
-    println!("\nSending test request...");
-    match client.execute(&config).await {
-        Ok(response) => {
-            println!("Status: {}", response.status());
-            println!("Response size: {} bytes", response.content_length().unwrap_or(0));
-        }
-        Err(e) => {
-            eprintln!("Request failed: {}", e);
-            std::process::exit(1);
-        }
+    // Run the benchmark
+    let executor = Executor::new(client, config);
+    if let Err(e) = executor.run().await {
+        eprintln!("Benchmark failed: {}", e);
+        std::process::exit(1);
     }
 }

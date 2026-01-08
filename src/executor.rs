@@ -1,0 +1,168 @@
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
+
+use crate::client::HttpClient;
+use crate::config::{BenchConfig, StopCondition};
+use crate::error::Result;
+
+/// Shared state for coordinating workers
+struct ExecutorState {
+    /// Signal to stop all workers
+    stop: AtomicBool,
+    /// Counter for completed requests
+    request_count: AtomicUsize,
+    /// Target request count (if applicable)
+    target_requests: Option<usize>,
+}
+
+impl ExecutorState {
+    fn new(stop_condition: &StopCondition) -> Self {
+        let target_requests = match stop_condition {
+            StopCondition::Requests(n) => Some(*n),
+            _ => None,
+        };
+
+        ExecutorState {
+            stop: AtomicBool::new(false),
+            request_count: AtomicUsize::new(0),
+            target_requests,
+        }
+    }
+
+    /// Check if workers should continue
+    fn should_continue(&self) -> bool {
+        if self.stop.load(Ordering::Relaxed) {
+            return false;
+        }
+
+        if let Some(target) = self.target_requests {
+            let count = self.request_count.load(Ordering::Relaxed);
+            if count >= target {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Increment request counter, returns true if we should continue
+    fn increment_and_check(&self) -> bool {
+        let prev = self.request_count.fetch_add(1, Ordering::Relaxed);
+
+        if let Some(target) = self.target_requests {
+            if prev + 1 >= target {
+                self.stop.store(true, Ordering::Relaxed);
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Signal all workers to stop
+    fn signal_stop(&self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Async HTTP executor with fixed concurrency
+pub struct Executor {
+    client: Arc<HttpClient>,
+    config: Arc<BenchConfig>,
+}
+
+impl Executor {
+    /// Create a new executor
+    pub fn new(client: HttpClient, config: BenchConfig) -> Self {
+        Executor {
+            client: Arc::new(client),
+            config: Arc::new(config),
+        }
+    }
+
+    /// Run the benchmark
+    pub async fn run(&self) -> Result<()> {
+        let state = Arc::new(ExecutorState::new(&self.config.stop_condition));
+        let start_time = Instant::now();
+
+        println!("\nStarting benchmark with {} workers...", self.config.concurrency);
+
+        // Spawn duration timer if needed
+        if let StopCondition::Duration(duration) = self.config.stop_condition {
+            let state_clone = Arc::clone(&state);
+            tokio::spawn(async move {
+                tokio::time::sleep(duration).await;
+                state_clone.signal_stop();
+            });
+        }
+
+        // Spawn Ctrl+C handler
+        let state_for_ctrlc = Arc::clone(&state);
+        tokio::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                println!("\nReceived Ctrl+C, shutting down...");
+                state_for_ctrlc.signal_stop();
+            }
+        });
+
+        // Spawn worker tasks
+        let mut handles = Vec::with_capacity(self.config.concurrency);
+
+        for worker_id in 0..self.config.concurrency {
+            let client = Arc::clone(&self.client);
+            let config = Arc::clone(&self.config);
+            let state = Arc::clone(&state);
+
+            let handle = tokio::spawn(async move {
+                run_worker(worker_id, client, config, state).await
+            });
+
+            handles.push(handle);
+        }
+
+        // Wait for all workers to complete
+        for handle in handles {
+            let _ = handle.await;
+        }
+
+        let elapsed = start_time.elapsed();
+        let total_requests = state.request_count.load(Ordering::Relaxed);
+
+        println!("\n--- Benchmark Complete ---");
+        println!("Total requests: {}", total_requests);
+        println!("Total time: {:.2}s", elapsed.as_secs_f64());
+        println!(
+            "Requests/sec: {:.2}",
+            total_requests as f64 / elapsed.as_secs_f64()
+        );
+
+        Ok(())
+    }
+}
+
+/// Worker loop that executes requests
+async fn run_worker(
+    _worker_id: usize,
+    client: Arc<HttpClient>,
+    config: Arc<BenchConfig>,
+    state: Arc<ExecutorState>,
+) {
+    while state.should_continue() {
+        match client.execute(&config).await {
+            Ok(response) => {
+                let status = response.status();
+                if !status.is_success() {
+                    eprintln!("HTTP {}", status);
+                }
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+            }
+        }
+
+        if !state.increment_and_check() {
+            break;
+        }
+    }
+}
