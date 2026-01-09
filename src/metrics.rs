@@ -25,6 +25,37 @@ pub struct BenchmarkResults {
     pub status_codes: HashMap<u16, usize>,
 }
 
+impl BenchmarkResults {
+    /// Print results to stdout
+    pub fn print(&self) {
+        println!("\n--- Benchmark Complete ---");
+        println!(
+            "Requests:     {} total, {} success, {} errors",
+            self.total_requests, self.successful_requests, self.failed_requests
+        );
+        println!("Duration:     {:.2}s", self.duration.as_secs_f64());
+        println!("Throughput:   {:.2} req/s", self.throughput);
+
+        println!("\nLatency:");
+        println!("  Min:    {}", format_duration(self.latency_min));
+        println!("  Max:    {}", format_duration(self.latency_max));
+        println!("  Mean:   {}", format_duration(self.latency_mean));
+        println!("  p50:    {}", format_duration(self.latency_p50));
+        println!("  p90:    {}", format_duration(self.latency_p90));
+        println!("  p95:    {}", format_duration(self.latency_p95));
+        println!("  p99:    {}", format_duration(self.latency_p99));
+
+        if !self.status_codes.is_empty() {
+            println!("\nStatus codes:");
+            let mut codes: Vec<_> = self.status_codes.iter().collect();
+            codes.sort_by_key(|(k, _)| *k);
+            for (code, count) in codes {
+                println!("  {}: {}", code, count);
+            }
+        }
+    }
+}
+
 /// Aggregated metrics from all requests
 pub struct Metrics {
     pub total: usize,

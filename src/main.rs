@@ -9,7 +9,6 @@ use httpress::executor::Executor;
 async fn main() {
     let args = Args::parse();
 
-    // Build config from CLI args
     let config = match BenchConfig::from_args(args) {
         Ok(c) => c,
         Err(e) => {
@@ -26,7 +25,6 @@ async fn main() {
         println!("Rate limit: {} req/s", rate);
     }
 
-    // Create HTTP client
     let client = match HttpClient::new(config.timeout) {
         Ok(c) => c,
         Err(e) => {
@@ -35,12 +33,14 @@ async fn main() {
         }
     };
 
-    // Run the benchmark
-    let executor = Executor::new(client, config);
-    if let Err(e) = executor.run().await {
-        eprintln!("Benchmark failed: {}", e);
-        std::process::exit(1);
-    }
+    println!("\nStarting benchmark with {} workers...", config.concurrency);
 
-   
+    let executor = Executor::new(client, config);
+    match executor.run().await {
+        Ok(results) => results.print(),
+        Err(e) => {
+            eprintln!("Benchmark failed: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
