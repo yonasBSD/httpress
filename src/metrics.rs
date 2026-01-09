@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 /// Result of a single HTTP request
 pub struct RequestResult {
     pub latency: Duration,
-    pub success: bool,
+    pub status: Option<u16>,
 }
 
 /// Aggregated metrics from all requests
@@ -11,6 +12,7 @@ pub struct Metrics {
     pub total: usize,
     pub success: usize,
     pub latencies: Vec<Duration>,
+    pub status_codes: HashMap<u16, usize>,
 }
 
 impl Metrics {
@@ -19,13 +21,17 @@ impl Metrics {
             total: 0,
             success: 0,
             latencies: Vec::new(),
+            status_codes: HashMap::new(),
         }
     }
 
     pub fn record(&mut self, result: RequestResult) {
         self.total += 1;
-        if result.success {
-            self.success += 1;
+        if let Some(status) = result.status {
+            *self.status_codes.entry(status).or_insert(0) += 1;
+            if (200..300).contains(&status) {
+                self.success += 1;
+            }
         }
         self.latencies.push(result.latency);
     }
@@ -64,6 +70,15 @@ impl Metrics {
             println!("  p90:    {}", format_duration(p90));
             println!("  p95:    {}", format_duration(p95));
             println!("  p99:    {}", format_duration(p99));
+        }
+
+        if !self.status_codes.is_empty() {
+            println!("\nStatus codes:");
+            let mut codes: Vec<_> = self.status_codes.iter().collect();
+            codes.sort_by_key(|(k, _)| *k);
+            for (code, count) in codes {
+                println!("  {}: {}", code, count);
+            }
         }
     }
 }

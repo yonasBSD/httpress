@@ -142,12 +142,12 @@ async fn run_worker(
 ) {
     while state.increment_and_check() {
         let start = Instant::now();
-        let success = match client.execute(&config).await {
-            Ok(response) => response.status().is_success(),
-            Err(_) => false,
+        let status = match client.execute(&config).await {
+            Ok(response) => Some(response.status().as_u16()),
+            Err(_) => None,
         };
         let latency = start.elapsed();
 
-        let _ = tx.send(RequestResult { latency, success });
+        let _ = tx.send(RequestResult { latency, status });
     }
 }
