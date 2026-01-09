@@ -12,6 +12,9 @@ pub enum Error {
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
 
+    #[error("URL is required")]
+    MissingUrl,
+
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
