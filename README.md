@@ -14,7 +14,7 @@ Or from source:
 cargo install --path .
 ```
 
-## Usage
+## CLI Usage
 
 ```bash
 # Basic benchmark (10 concurrent connections, infinite loop)
@@ -26,25 +26,29 @@ httpress http://example.com -n 1000 -c 50
 # Fixed total duration
 httpress http://example.com -d 30s -c 100
 
+# Rate limiting
+httpress http://example.com -r 1000 -d 10s
+
 # POST with body and headers
 httpress http://example.com/add -m post \
   -H "Content-Type: application/json" \
   -b '{"key": "value"}'
 ```
 
-## Options
+### Options
 
 | Flag                | Description                  | Default |
 | ------------------- | ---------------------------- | ------- |
 | `-n, --requests`    | Total number of requests     | -       |
 | `-d, --duration`    | Test duration (e.g. 10s, 1m) | -       |
 | `-c, --concurrency` | Concurrent connections       | 10      |
+| `-r, --rate`        | Rate limit (req/s)           | -       |
 | `-m, --method`      | HTTP method                  | GET     |
 | `-H, --header`      | HTTP header (repeatable)     | -       |
 | `-b, --body`        | Request body                 | -       |
 | `-t, --timeout`     | Request timeout in seconds   | 30      |
 
-## Example Output
+### Example Output
 
 ```
 -> httpress http://127.0.0.1:3000 -n 1000 -c 10
@@ -73,7 +77,7 @@ Status codes:
   200: 1000
 ```
 
-## Development
+### Using the test server
 
 ```bash
 # Run the test server
@@ -82,3 +86,15 @@ cargo run --example test_server
 # In another terminal, run benchmarks
 cargo run -- http://127.0.0.1:3000 -n 100 -c 10
 ```
+
+## Library Usage
+
+Add httpress as a dependency in your `Cargo.toml`:
+
+```toml
+[dependencies]
+httpress = "0.1"
+tokio = { version = "1", features = ["full"] }
+```
+
+See [examples/basic_benchmark.rs](examples/basic_benchmark.rs) for a basic example of using the api.
