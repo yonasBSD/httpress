@@ -43,15 +43,27 @@ impl Metrics {
         println!("Throughput:   {:.2} req/s", throughput);
 
         if !self.latencies.is_empty() {
-            let min = self.latencies.iter().min().unwrap();
-            let max = self.latencies.iter().max().unwrap();
-            let sum: Duration = self.latencies.iter().sum();
-            let mean = sum / self.latencies.len() as u32;
+            let mut sorted = self.latencies.clone();
+            sorted.sort();
+
+            let min = sorted.first().unwrap();
+            let max = sorted.last().unwrap();
+            let sum: Duration = sorted.iter().sum();
+            let mean = sum / sorted.len() as u32;
+
+            let p50 = percentile(&sorted, 50);
+            let p90 = percentile(&sorted, 90);
+            let p95 = percentile(&sorted, 95);
+            let p99 = percentile(&sorted, 99);
 
             println!("\nLatency:");
             println!("  Min:    {}", format_duration(*min));
             println!("  Max:    {}", format_duration(*max));
             println!("  Mean:   {}", format_duration(mean));
+            println!("  p50:    {}", format_duration(p50));
+            println!("  p90:    {}", format_duration(p90));
+            println!("  p95:    {}", format_duration(p95));
+            println!("  p99:    {}", format_duration(p99));
         }
     }
 }
@@ -60,6 +72,11 @@ impl Default for Metrics {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn percentile(sorted: &[Duration], p: usize) -> Duration {
+    let idx = (sorted.len() * p / 100).saturating_sub(1).max(0);
+    sorted[idx]
 }
 
 fn format_duration(d: Duration) -> String {
