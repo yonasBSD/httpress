@@ -17,7 +17,7 @@ pub enum StopCondition {
 }
 
 /// HTTP method for requests
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HttpMethod {
     Get,
     Post,
