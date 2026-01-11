@@ -148,6 +148,7 @@ impl BenchmarkBuilder {
             stop_condition: self.stop_condition,
             timeout: self.timeout,
             rate: self.rate,
+            rate_fn: None,
         };
 
         Ok(Benchmark { config })
