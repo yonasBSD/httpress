@@ -22,18 +22,6 @@ async fn main() -> httpress::Result<()> {
             let end_rate = 1000.0;
             let current = start_rate + (end_rate - start_rate) * progress;
 
-            // Print progress every second (approximately)
-            if ctx.total_requests % 100 == 0 {
-                println!(
-                    "[{:>5.1}s] Rate: {:>6.0} req/s | Total: {:>5} | Success: {:>5} | Failed: {:>3}",
-                    elapsed_secs,
-                    current,
-                    ctx.total_requests,
-                    ctx.successful_requests,
-                    ctx.failed_requests
-                );
-            }
-
             current
         })
         .build()?
