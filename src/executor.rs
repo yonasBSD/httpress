@@ -247,7 +247,6 @@ async fn execute_request_with_hooks(
             }
         }
 
-        // Execute HTTP request
         let (latency, status) = perform_http_request(worker_id, request_number, client, config).await;
 
         // Execute after_request hooks
@@ -463,35 +462,17 @@ async fn run_worker_dynamic(
                     break;
                 }
 
-                let start = Instant::now();
-                let status = match &config.request_source {
-                    RequestSource::Static(_) => match client.execute(&config).await {
-                        Ok(response) => Some(response.status().as_u16()),
-                        Err(_) => None,
-                    },
-                    RequestSource::Dynamic(generator) => {
-                        let ctx = RequestContext { worker_id, request_number };
-                        let request_config = generator(ctx);
+                let result = execute_request_with_hooks(
+                    worker_id,
+                    request_number,
+                    &client,
+                    &config,
+                    &state,
+                    start_time,
+                )
+                .await;
 
-                        match client.execute_request(&request_config).await {
-                            Ok(response) => Some(response.status().as_u16()),
-                            Err(_) => None,
-                        }
-                    }
-                };
-                let latency = start.elapsed();
-
-                if let Some(s) = status {
-                    if (200..300).contains(&s) {
-                        state.record_success();
-                    } else {
-                        state.record_failure();
-                    }
-                } else {
-                    state.record_failure();
-                }
-
-                let _ = tx.send(RequestResult { latency, status });
+                let _ = tx.send(result);
                 request_number += 1;
             }
         }
