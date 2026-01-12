@@ -124,6 +124,166 @@ fn execute_after_hooks(hooks: &[AfterRequestHook], ctx: AfterRequestContext) -> 
     HookAction::Continue
 }
 
+/// Build context for before_request hooks
+fn build_before_context(
+    worker_id: usize,
+    request_number: usize,
+    state: &ExecutorState,
+    start_time: Instant,
+) -> BeforeRequestContext {
+    let (total, success, failed) = state.get_counts();
+    BeforeRequestContext {
+        worker_id,
+        request_number,
+        elapsed: start_time.elapsed(),
+        total_requests: total,
+        successful_requests: success,
+        failed_requests: failed,
+    }
+}
+
+/// Build context for after_request hooks
+fn build_after_context(
+    worker_id: usize,
+    request_number: usize,
+    state: &ExecutorState,
+    start_time: Instant,
+    latency: Duration,
+    status: Option<u16>,
+) -> AfterRequestContext {
+    let (total, success, failed) = state.get_counts();
+    AfterRequestContext {
+        worker_id,
+        request_number,
+        elapsed: start_time.elapsed(),
+        total_requests: total,
+        successful_requests: success,
+        failed_requests: failed,
+        latency,
+        status,
+    }
+}
+
+/// Execute the actual HTTP request
+async fn perform_http_request(
+    worker_id: usize,
+    request_number: usize,
+    client: &HttpClient,
+    config: &BenchConfig,
+) -> (Duration, Option<u16>) {
+    let start = Instant::now();
+    let status = match &config.request_source {
+        RequestSource::Static(_) => match client.execute(config).await {
+            Ok(response) => Some(response.status().as_u16()),
+            Err(_) => None,
+        },
+        RequestSource::Dynamic(generator) => {
+            let ctx = RequestContext {
+                worker_id,
+                request_number,
+            };
+            let request_config = generator(ctx);
+
+            match client.execute_request(&request_config).await {
+                Ok(response) => Some(response.status().as_u16()),
+                Err(_) => None,
+            }
+        }
+    };
+    let latency = start.elapsed();
+    (latency, status)
+}
+
+/// Record request result to state based on status code
+fn record_result(state: &ExecutorState, status: Option<u16>) {
+    if let Some(s) = status {
+        if (200..300).contains(&s) {
+            state.record_success();
+        } else {
+            state.record_failure();
+        }
+    } else {
+        state.record_failure();
+    }
+}
+
+/// Execute a single request with hooks and retry logic
+async fn execute_request_with_hooks(
+    worker_id: usize,
+    request_number: usize,
+    client: &HttpClient,
+    config: &BenchConfig,
+    state: &ExecutorState,
+    start_time: Instant,
+) -> RequestResult {
+    let max_retries = config.max_retries;
+    let mut retry_count = 0;
+
+    loop {
+        // Execute before_request hooks
+        if !config.before_request_hooks.is_empty() {
+            let ctx = build_before_context(worker_id, request_number, state, start_time);
+            match execute_before_hooks(&config.before_request_hooks, ctx) {
+                HookAction::Continue => {}
+                HookAction::Abort => {
+                    state.record_failure();
+                    return RequestResult {
+                        latency: Duration::ZERO,
+                        status: None,
+                    };
+                }
+                HookAction::Retry => {
+                    if retry_count < max_retries {
+                        retry_count += 1;
+                        continue;
+                    } else {
+                        state.record_failure();
+                        return RequestResult {
+                            latency: Duration::ZERO,
+                            status: None,
+                        };
+                    }
+                }
+            }
+        }
+
+        // Execute HTTP request
+        let (latency, status) = perform_http_request(worker_id, request_number, client, config).await;
+
+        // Execute after_request hooks
+        let hook_action = if !config.after_request_hooks.is_empty() {
+            let ctx = build_after_context(worker_id, request_number, state, start_time, latency, status);
+            execute_after_hooks(&config.after_request_hooks, ctx)
+        } else {
+            HookAction::Continue
+        };
+
+        match hook_action {
+            HookAction::Continue => {
+                record_result(state, status);
+                return RequestResult { latency, status };
+            }
+            HookAction::Abort => {
+                state.record_failure();
+                return RequestResult {
+                    latency,
+                    status: None,
+                };
+            }
+            HookAction::Retry => {
+                if retry_count < max_retries {
+                    retry_count += 1;
+                    continue;
+                } else {
+                    // Max retries exceeded, record the result anyway
+                    record_result(state, status);
+                    return RequestResult { latency, status };
+                }
+            }
+        }
+    }
+}
+
 /// Async HTTP executor with fixed concurrency
 pub struct Executor {
     client: Arc<HttpClient>,
@@ -210,7 +370,7 @@ async fn run_worker(
 ) {
     match &config.rate_fn {
         None => {
-            run_worker_static(worker_id, client, Arc::clone(&config), state, tx, rate_per_worker).await
+            run_worker_static(worker_id, client, Arc::clone(&config), state, tx, rate_per_worker, start_time).await
         }
         Some(rate_fn) => {
             run_worker_dynamic(worker_id, client, Arc::clone(&config), state, tx, rate_fn.clone(), start_time).await
@@ -226,6 +386,7 @@ async fn run_worker_static(
     state: Arc<ExecutorState>,
     tx: mpsc::UnboundedSender<RequestResult>,
     rate_per_worker: Option<u64>,
+    start_time: Instant,
 ) {
     let mut rate_interval = rate_per_worker.map(|r| interval(Duration::from_micros(1_000_000 / r)));
 
@@ -236,35 +397,17 @@ async fn run_worker_static(
             interval.tick().await;
         }
 
-        let start = Instant::now();
-        let status = match &config.request_source {
-            RequestSource::Static(_) => match client.execute(&config).await {
-                Ok(response) => Some(response.status().as_u16()),
-                Err(_) => None,
-            },
-            RequestSource::Dynamic(generator) => {
-                let ctx = RequestContext { worker_id, request_number };
-                let request_config = generator(ctx);
+        let result = execute_request_with_hooks(
+            worker_id,
+            request_number,
+            &client,
+            &config,
+            &state,
+            start_time,
+        )
+        .await;
 
-                match client.execute_request(&request_config).await {
-                    Ok(response) => Some(response.status().as_u16()),
-                    Err(_) => None,
-                }
-            }
-        };
-        let latency = start.elapsed();
-
-        if let Some(s) = status {
-            if (200..300).contains(&s) {
-                state.record_success();
-            } else {
-                state.record_failure();
-            }
-        } else {
-            state.record_failure();
-        }
-
-        let _ = tx.send(RequestResult { latency, status });
+        let _ = tx.send(result);
         request_number += 1;
     }
 }
