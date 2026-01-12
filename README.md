@@ -93,7 +93,7 @@ Add httpress as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-httpress = "0.4"
+httpress = "0.5"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -102,3 +102,5 @@ See [examples/basic_benchmark.rs](examples/basic_benchmark.rs) for a basic examp
 See [examples/custom_requests.rs](examples/custom_requests.rs) for an example of using the request_fn() method to generate custom requests.
 
 See [examples/rate_ramping.rs](examples/rate_ramping.rs) for an example of using the rate_fn() method to generate custom rates.
+
+See [examples/hooks_metrics.rs](examples/hooks_metrics.rs) for an example of how to use hooks to generate custom metrics.
