@@ -11,11 +11,15 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    /// Create a new HTTP client with the given timeout
-    pub fn new(timeout: Duration) -> Result<Self> {
+    /// Create a new HTTP client with the given timeout and connection pool settings
+    pub fn new(timeout: Duration, concurrency: usize) -> Result<Self> {
         let client = Client::builder()
             .timeout(timeout)
-            .pool_max_idle_per_host(0)
+            .pool_max_idle_per_host(concurrency)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(60))
+            .tcp_nodelay(true)
+            .http1_only()
             .build()?;
 
         Ok(HttpClient { client })

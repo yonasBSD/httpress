@@ -689,7 +689,7 @@ impl Benchmark {
     /// # }
     /// ```
     pub async fn run(self) -> Result<BenchmarkResults> {
-        let client = HttpClient::new(self.config.timeout)?;
+        let client = HttpClient::new(self.config.timeout, self.config.concurrency)?;
         let executor = Executor::new(client, self.config);
         executor.run().await
     }
