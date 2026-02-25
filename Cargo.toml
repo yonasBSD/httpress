@@ -18,3 +18,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "tim
 
 [dev-dependencies]
 axum = "0.8"
+
+[profile.profiling]
+inherits = "release"
+debug = true

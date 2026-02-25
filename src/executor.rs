@@ -159,7 +159,11 @@ async fn perform_http_request(
     let start = Instant::now();
     let status = match &config.request_source {
         RequestSource::Static(_) => match client.execute(config).await {
-            Ok(response) => Some(response.status().as_u16()),
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let _ = response.bytes().await;
+                Some(status)
+            }
             Err(_) => None,
         },
         RequestSource::Dynamic(generator) => {
@@ -170,7 +174,11 @@ async fn perform_http_request(
             let request_config = generator(ctx);
 
             match client.execute_request(&request_config).await {
-                Ok(response) => Some(response.status().as_u16()),
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    let _ = response.bytes().await;
+                    Some(status)
+                }
                 Err(_) => None,
             }
         }
