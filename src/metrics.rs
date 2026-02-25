@@ -206,6 +206,15 @@ impl Metrics {
         }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        Metrics {
+            total: 0,
+            success: 0,
+            latencies: Vec::with_capacity(capacity),
+            status_codes: HashMap::new(),
+        }
+    }
+
     pub fn record(&mut self, result: RequestResult) {
         self.total += 1;
         if let Some(status) = result.status {

@@ -335,7 +335,18 @@ impl Executor {
 
         drop(tx);
 
-        let mut metrics = Metrics::new();
+        let capacity = match self.config.stop_condition {
+            StopCondition::Requests(n) => n,
+            StopCondition::Duration(d) => {
+                let secs = d.as_secs_f64();
+                match self.config.rate {
+                    Some(rate) => (rate as f64 * secs) as usize,
+                    None => self.config.concurrency * 1_000 * secs as usize,
+                }
+            }
+            StopCondition::Infinite => 10_000,
+        };
+        let mut metrics = Metrics::with_capacity(capacity);
         while let Some(result) = rx.recv().await {
             metrics.record(result);
         }
