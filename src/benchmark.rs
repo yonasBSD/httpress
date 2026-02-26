@@ -29,6 +29,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::Bytes;
+
 use crate::client::HttpClient;
 use crate::config::{
     AfterRequestHook, BeforeRequestHook, BenchConfig, HttpMethod, RateContext, RateFunction,
@@ -569,7 +571,7 @@ impl BenchmarkBuilder {
                     url,
                     method: self.method.unwrap_or(HttpMethod::Get),
                     headers: self.headers,
-                    body: self.body,
+                    body: self.body.map(Bytes::from),
                 };
                 RequestSource::Static(request_config)
             }

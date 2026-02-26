@@ -37,6 +37,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::Bytes;
+
 use crate::cli::Args;
 use crate::error::Error;
 
@@ -91,6 +93,7 @@ pub enum HttpMethod {
 /// ```
 /// use httpress::{RequestConfig, HttpMethod};
 /// use std::collections::HashMap;
+/// use bytes::Bytes;
 ///
 /// let config = RequestConfig {
 ///     url: "http://localhost:3000/api/users".to_string(),
@@ -99,7 +102,7 @@ pub enum HttpMethod {
 ///         ("Content-Type".to_string(), "application/json".to_string()),
 ///         ("Authorization".to_string(), "Bearer token123".to_string()),
 ///     ]),
-///     body: Some(r#"{"name": "John"}"#.to_string()),
+///     body: Some(Bytes::from(r#"{"name": "John"}"#)),
 /// };
 /// ```
 #[derive(Debug, Clone)]
@@ -114,7 +117,7 @@ pub struct RequestConfig {
     pub headers: HashMap<String, String>,
 
     /// Optional request body.
-    pub body: Option<String>,
+    pub body: Option<Bytes>,
 }
 
 /// Context passed to request generator functions.
@@ -508,7 +511,7 @@ impl BenchConfig {
             url: args.url,
             method: args.method,
             headers,
-            body: args.body,
+            body: args.body.map(Bytes::from),
         };
 
         Ok(BenchConfig {

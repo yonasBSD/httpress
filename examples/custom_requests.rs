@@ -34,7 +34,7 @@ async fn main() -> httpress::Result<()> {
                 method,
                 headers,
                 body: if method == HttpMethod::Post {
-                    Some(format!(r#"{{"user_id": {}, "worker": {}}}"#, user_id, ctx.worker_id))
+                    Some(format!(r#"{{"user_id": {}, "worker": {}}}"#, user_id, ctx.worker_id).into())
                 } else {
                     None
                 },

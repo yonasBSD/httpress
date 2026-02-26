@@ -51,7 +51,7 @@ impl HttpClient {
             request = request.header(key, value);
         }
 
-        if let Some(ref body) = req.body {
+        if let Some(body) = &req.body {
             request = request.body(body.clone());
         }
 
