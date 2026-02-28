@@ -393,16 +393,15 @@ impl Executor {
             let rate_rx = rate_rx.clone();
 
             let ctx = WorkerContext {
-                    worker_id,
-                    client,
-                    config,
-                    state,
-                    tx,
-                    start_time,
-                };
-            let handle = tokio::spawn(async move {
-                run_worker(ctx, rate_per_worker, rate_rx).await
-            });
+                worker_id,
+                client,
+                config,
+                state,
+                tx,
+                start_time,
+            };
+            let handle =
+                tokio::spawn(async move { run_worker(ctx, rate_per_worker, rate_rx).await });
 
             handles.push(handle);
         }

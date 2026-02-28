@@ -20,9 +20,8 @@ async fn main() -> httpress::Result<()> {
 
             let start_rate = 100.0;
             let end_rate = 1000.0;
-            let current = start_rate + (end_rate - start_rate) * progress;
 
-            current
+            start_rate + (end_rate - start_rate) * progress
         })
         .build()?
         .run()
