@@ -231,33 +231,40 @@ impl Metrics {
         self.latencies.sort();
         let sorted = &self.latencies;
 
-        let (latency_min, latency_max, latency_mean, latency_p50, latency_p90, latency_p95, latency_p99) =
-            if sorted.is_empty() {
-                (
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    Duration::ZERO,
-                )
-            } else {
-                let min = *sorted.first().unwrap();
-                let max = *sorted.last().unwrap();
-                let sum: Duration = sorted.iter().sum();
-                let mean = sum / sorted.len() as u32;
+        let (
+            latency_min,
+            latency_max,
+            latency_mean,
+            latency_p50,
+            latency_p90,
+            latency_p95,
+            latency_p99,
+        ) = if sorted.is_empty() {
+            (
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+                Duration::ZERO,
+            )
+        } else {
+            let min = *sorted.first().unwrap();
+            let max = *sorted.last().unwrap();
+            let sum: Duration = sorted.iter().sum();
+            let mean = sum / sorted.len() as u32;
 
-                (
-                    min,
-                    max,
-                    mean,
-                    percentile(sorted, 50),
-                    percentile(sorted, 90),
-                    percentile(sorted, 95),
-                    percentile(sorted, 99),
-                )
-            };
+            (
+                min,
+                max,
+                mean,
+                percentile(sorted, 50),
+                percentile(sorted, 90),
+                percentile(sorted, 95),
+                percentile(sorted, 99),
+            )
+        };
 
         BenchmarkResults {
             total_requests: self.total,

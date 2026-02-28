@@ -10,8 +10,8 @@ async fn main() -> Result<()> {
     // Define custom metrics structure
     #[derive(Default)]
     struct CustomMetrics {
-        slow_requests: usize,        // Requests slower than 100ms
-        very_slow_requests: usize,   // Requests slower than 500ms
+        slow_requests: usize,      // Requests slower than 100ms
+        very_slow_requests: usize, // Requests slower than 500ms
         by_worker: HashMap<usize, usize>,
         status_codes: HashMap<u16, usize>,
     }

@@ -13,6 +13,16 @@ use crate::config::{
 use crate::error::Result;
 use crate::metrics::{BenchmarkResults, Metrics, RequestResult};
 
+/// Common context shared by all worker tasks
+struct WorkerContext {
+    worker_id: usize,
+    client: Arc<HttpClient>,
+    config: Arc<BenchConfig>,
+    state: Arc<ExecutorState>,
+    tx: mpsc::UnboundedSender<RequestResult>,
+    start_time: Instant,
+}
+
 /// Shared state for coordinating workers
 struct ExecutorState {
     /// Signal to stop all workers
@@ -382,18 +392,16 @@ impl Executor {
             let tx = tx.clone();
             let rate_rx = rate_rx.clone();
 
-            let handle = tokio::spawn(async move {
-                run_worker(
+            let ctx = WorkerContext {
                     worker_id,
                     client,
                     config,
                     state,
                     tx,
-                    rate_per_worker,
-                    rate_rx,
                     start_time,
-                )
-                .await
+                };
+            let handle = tokio::spawn(async move {
+                run_worker(ctx, rate_per_worker, rate_rx).await
             });
 
             handles.push(handle);
@@ -432,77 +440,46 @@ impl Executor {
 
 /// Worker loop that executes requests
 async fn run_worker(
-    worker_id: usize,
-    client: Arc<HttpClient>,
-    config: Arc<BenchConfig>,
-    state: Arc<ExecutorState>,
-    tx: mpsc::UnboundedSender<RequestResult>,
+    ctx: WorkerContext,
     rate_per_worker: Option<u64>,
     rate_rx: Option<watch::Receiver<f64>>,
-    start_time: Instant,
 ) {
     match rate_rx {
-        None => {
-            run_worker_static(
-                worker_id, client, config, state, tx, rate_per_worker, start_time,
-            )
-            .await
-        }
-        Some(rate_rx) => {
-            run_worker_dynamic(
-                worker_id, client, config, state, tx, rate_rx, start_time,
-            )
-            .await
-        }
+        None => run_worker_static(ctx, rate_per_worker).await,
+        Some(rate_rx) => run_worker_dynamic(ctx, rate_rx).await,
     }
 }
 
 /// Worker with static rate limiting
-async fn run_worker_static(
-    worker_id: usize,
-    client: Arc<HttpClient>,
-    config: Arc<BenchConfig>,
-    state: Arc<ExecutorState>,
-    tx: mpsc::UnboundedSender<RequestResult>,
-    rate_per_worker: Option<u64>,
-    start_time: Instant,
-) {
+async fn run_worker_static(ctx: WorkerContext, rate_per_worker: Option<u64>) {
     let mut rate_interval = rate_per_worker.map(|r| interval(Duration::from_micros(1_000_000 / r)));
 
     let mut request_number = 0;
 
-    while state.increment_and_check() {
+    while ctx.state.increment_and_check() {
         if let Some(ref mut interval) = rate_interval {
             interval.tick().await;
         }
 
         let result = execute_request_with_hooks(
-            worker_id,
+            ctx.worker_id,
             request_number,
-            &client,
-            &config,
-            &state,
-            start_time,
+            &ctx.client,
+            &ctx.config,
+            &ctx.state,
+            ctx.start_time,
         )
         .await;
 
-        let _ = tx.send(result);
+        let _ = ctx.tx.send(result);
         request_number += 1;
     }
 }
 
 /// Worker with dynamic rate control
-async fn run_worker_dynamic(
-    worker_id: usize,
-    client: Arc<HttpClient>,
-    config: Arc<BenchConfig>,
-    state: Arc<ExecutorState>,
-    tx: mpsc::UnboundedSender<RequestResult>,
-    mut rate_rx: watch::Receiver<f64>,
-    start_time: Instant,
-) {
+async fn run_worker_dynamic(ctx: WorkerContext, mut rate_rx: watch::Receiver<f64>) {
     let mut current_rate = *rate_rx.borrow();
-    let mut rate_interval = create_rate_interval(current_rate, config.concurrency);
+    let mut rate_interval = create_rate_interval(current_rate, ctx.config.concurrency);
     let mut rate_active = true;
 
     let mut request_number = 0;
@@ -515,7 +492,7 @@ async fn run_worker_dynamic(
                         let new_rate = *rate_rx.borrow_and_update();
                         if (new_rate - current_rate).abs() > 0.01 {
                             current_rate = new_rate;
-                            rate_interval = create_rate_interval(current_rate, config.concurrency);
+                            rate_interval = create_rate_interval(current_rate, ctx.config.concurrency);
                         }
                     }
                     Err(_) => {
@@ -525,21 +502,21 @@ async fn run_worker_dynamic(
                 }
             }
             _ = rate_interval.tick() => {
-                if !state.increment_and_check() {
+                if !ctx.state.increment_and_check() {
                     break;
                 }
 
                 let result = execute_request_with_hooks(
-                    worker_id,
+                    ctx.worker_id,
                     request_number,
-                    &client,
-                    &config,
-                    &state,
-                    start_time,
+                    &ctx.client,
+                    &ctx.config,
+                    &ctx.state,
+                    ctx.start_time,
                 )
                 .await;
 
-                let _ = tx.send(result);
+                let _ = ctx.tx.send(result);
                 request_number += 1;
             }
         }

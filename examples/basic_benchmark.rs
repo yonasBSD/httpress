@@ -18,7 +18,8 @@ async fn main() -> Result<()> {
     // Or access individual metrics programmatically
     println!("\n--- Programmatic Access ---");
     println!("Total requests: {}", results.total_requests);
-    println!("Success rate: {:.2}%",
+    println!(
+        "Success rate: {:.2}%",
         (results.successful_requests as f64 / results.total_requests as f64) * 100.0
     );
     println!("Throughput: {:.2} req/s", results.throughput);

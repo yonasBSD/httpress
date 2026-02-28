@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use axum::{
+    Router,
     extract::{Path, State},
     http::StatusCode,
     routing::get,
-    Router,
 };
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;

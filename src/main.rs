@@ -37,7 +37,10 @@ async fn main() {
         }
     };
 
-    println!("\nStarting benchmark with {} workers...", config.concurrency);
+    println!(
+        "\nStarting benchmark with {} workers...",
+        config.concurrency
+    );
 
     let executor = Executor::new(client, config);
     match executor.run().await {

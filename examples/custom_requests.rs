@@ -13,10 +13,7 @@ async fn main() -> httpress::Result<()> {
 
             // Add custom headers based on worker and request number
             let mut headers = HashMap::new();
-            headers.insert(
-                "X-Worker-Id".to_string(),
-                ctx.worker_id.to_string(),
-            );
+            headers.insert("X-Worker-Id".to_string(), ctx.worker_id.to_string());
             headers.insert(
                 "X-Request-Number".to_string(),
                 ctx.request_number.to_string(),
@@ -34,7 +31,10 @@ async fn main() -> httpress::Result<()> {
                 method,
                 headers,
                 body: if method == HttpMethod::Post {
-                    Some(format!(r#"{{"user_id": {}, "worker": {}}}"#, user_id, ctx.worker_id).into())
+                    Some(
+                        format!(r#"{{"user_id": {}, "worker": {}}}"#, user_id, ctx.worker_id)
+                            .into(),
+                    )
                 } else {
                     None
                 },

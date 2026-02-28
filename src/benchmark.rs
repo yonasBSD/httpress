@@ -442,7 +442,10 @@ impl BenchmarkBuilder {
     /// ```
     pub fn before_request<F>(mut self, f: F) -> Self
     where
-        F: Fn(crate::config::BeforeRequestContext) -> crate::config::HookAction + Send + Sync + 'static,
+        F: Fn(crate::config::BeforeRequestContext) -> crate::config::HookAction
+            + Send
+            + Sync
+            + 'static,
     {
         self.before_request_hooks.push(Arc::new(f));
         self
@@ -494,7 +497,10 @@ impl BenchmarkBuilder {
     /// ```
     pub fn after_request<F>(mut self, f: F) -> Self
     where
-        F: Fn(crate::config::AfterRequestContext) -> crate::config::HookAction + Send + Sync + 'static,
+        F: Fn(crate::config::AfterRequestContext) -> crate::config::HookAction
+            + Send
+            + Sync
+            + 'static,
     {
         self.after_request_hooks.push(Arc::new(f));
         self
@@ -559,12 +565,12 @@ impl BenchmarkBuilder {
             (Some(_), Some(_)) => {
                 return Err(Error::InvalidConfig(
                     "Cannot use both url() and request_fn()".to_string(),
-                ))
+                ));
             }
             (None, None) => {
                 return Err(Error::InvalidConfig(
                     "Must provide either url() or request_fn()".to_string(),
-                ))
+                ));
             }
             (Some(url), None) => {
                 let request_config = RequestConfig {

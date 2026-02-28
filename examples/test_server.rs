@@ -1,12 +1,6 @@
 use std::time::Duration;
 
-use axum::{
-    Router,
-    extract::Path,
-    http::StatusCode,
-    routing::get,
-    Json,
-};
+use axum::{Json, Router, extract::Path, http::StatusCode, routing::get};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
