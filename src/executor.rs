@@ -406,6 +406,13 @@ async fn run_worker_static(ctx: WorkerContext, rate_period: Option<Duration>) {
 
         ctx.execute_and_send(request_number).await;
         request_number += 1;
+
+        // Yield to the runtime between requests when there's no rate limit.
+        // Without this, fast responses (e.g. localhost) turn the loop into a
+        // CPU-saturating spin that can starve the OS on high-core-count systems.
+        if rate_interval.is_none() {
+            tokio::task::yield_now().await;
+        }
     }
 }
 

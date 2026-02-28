@@ -20,7 +20,7 @@ async fn main() -> httpress::Result<()> {
             );
 
             // Vary request method based on request number
-            let method = if ctx.request_number % 10 == 0 {
+            let method = if ctx.request_number.is_multiple_of(10) {
                 HttpMethod::Post
             } else {
                 HttpMethod::Get
