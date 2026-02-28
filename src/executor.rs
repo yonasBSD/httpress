@@ -7,7 +7,7 @@ use tokio::time::{MissedTickBehavior, interval};
 
 use crate::client::HttpClient;
 use crate::config::{
-    AfterRequestContext, BeforeRequestContext, BenchConfig, HookAction, HttpMethod, RateContext,
+    AfterRequestContext, BeforeRequestContext, BenchConfig, HookAction, RateContext,
     RequestContext, RequestSource, StopCondition,
 };
 use crate::error::Result;
@@ -156,16 +156,6 @@ fn build_after_context(
     }
 }
 
-/// Consume the response body to ensure the connection can be reused.
-/// Skips body consumption for HEAD requests since there is no body.
-async fn consume_response(response: reqwest::Response, method: HttpMethod) -> Option<u16> {
-    let status = response.status().as_u16();
-    if method != HttpMethod::Head {
-        let _ = response.bytes().await;
-    }
-    Some(status)
-}
-
 /// Execute the actual HTTP request
 async fn perform_http_request(
     worker_id: usize,
@@ -175,22 +165,17 @@ async fn perform_http_request(
 ) -> (Duration, Option<u16>) {
     let start = Instant::now();
     let status = match &config.request_source {
-        RequestSource::Static(req) => match client.execute(config).await {
-            Ok(response) => consume_response(response, req.method).await,
-            Err(_) => None,
-        },
+        RequestSource::Static(_) => client.execute(config).await.unwrap_or_default(),
         RequestSource::Dynamic(generator) => {
             let ctx = RequestContext {
                 worker_id,
                 request_number,
             };
             let request_config = generator(ctx);
-            let method = request_config.method;
-
-            match client.execute_request(&request_config).await {
-                Ok(response) => consume_response(response, method).await,
-                Err(_) => None,
-            }
+            client
+                .execute_request(&request_config)
+                .await
+                .unwrap_or_default()
         }
     };
     let latency = start.elapsed();

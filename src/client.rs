@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use reqwest::{Client, Response};
+use reqwest::Client;
 
 use crate::config::{BenchConfig, HttpMethod, RequestConfig, RequestSource};
 use crate::error::Result;
@@ -26,7 +26,7 @@ impl HttpClient {
     }
 
     /// Execute a single HTTP request based on config
-    pub async fn execute(&self, config: &BenchConfig) -> Result<Response> {
+    pub async fn execute(&self, config: &BenchConfig) -> Result<Option<u16>> {
         match &config.request_source {
             RequestSource::Static(req) => self.execute_request(req).await,
             RequestSource::Dynamic(_) => {
@@ -36,7 +36,7 @@ impl HttpClient {
     }
 
     /// Execute a single HTTP request from RequestConfig
-    pub async fn execute_request(&self, req: &RequestConfig) -> Result<Response> {
+    pub async fn execute_request(&self, req: &RequestConfig) -> Result<Option<u16>> {
         let mut request = match req.method {
             HttpMethod::Get => self.client.get(&req.url),
             HttpMethod::Post => self.client.post(&req.url),
@@ -56,7 +56,13 @@ impl HttpClient {
         }
 
         let response = request.send().await?;
+        let status = response.status().as_u16();
 
-        Ok(response)
+        // Consume body to allow connection reuse (HEAD has no body)
+        if req.method != HttpMethod::Head {
+            let _ = response.bytes().await;
+        }
+
+        Ok(Some(status))
     }
 }
