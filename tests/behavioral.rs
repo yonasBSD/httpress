@@ -183,7 +183,7 @@ async fn test_latency_metrics_populated() {
 #[ignore = "requires internet access"]
 async fn test_https_connects_and_succeeds() {
     let results = Benchmark::builder()
-        .url("https://example.com")
+        .url("https://httpbin.org/get")
         .requests(5)
         .concurrency(1)
         .build()
