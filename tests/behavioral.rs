@@ -178,3 +178,20 @@ async fn test_latency_metrics_populated() {
     assert!(results.latency_mean <= results.latency_max);
     assert!(results.latency_p50 <= results.latency_p99);
 }
+
+#[tokio::test]
+#[ignore = "requires internet access"]
+async fn test_https_connects_and_succeeds() {
+    let results = Benchmark::builder()
+        .url("https://example.com")
+        .requests(5)
+        .concurrency(1)
+        .build()
+        .unwrap()
+        .run()
+        .await
+        .unwrap();
+
+    assert!(results.successful_requests > 0);
+    assert!(results.total_bytes > 0);
+}
