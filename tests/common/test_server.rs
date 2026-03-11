@@ -29,7 +29,8 @@ impl TestServer {
         let app = Router::new()
             .route("/ok", get(ok_handler))
             .route("/delay/{ms}", get(delay_handler))
-            .route("/status/{code}", get(status_handler));
+            .route("/status/{code}", get(status_handler))
+            .route("/body/{size}", get(body_handler));
 
         let handle = tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
@@ -53,6 +54,7 @@ impl TestServer {
             .route("/ok", get(ok_handler))
             .route("/delay/{ms}", get(delay_handler))
             .route("/status/{code}", get(status_handler))
+            .route("/body/{size}", get(body_handler))
             .route("/flaky", get(flaky_handler))
             .with_state(FlakyState {
                 counter,
@@ -80,6 +82,7 @@ impl TestServer {
             .route("/ok", get(ok_handler))
             .route("/delay/{ms}", get(delay_handler))
             .route("/status/{code}", get(status_handler))
+            .route("/body/{size}", get(body_handler))
             .route("/rotating", get(rotating_handler))
             .with_state(RotatingState { counter, codes });
 
@@ -112,6 +115,10 @@ async fn delay_handler(Path(ms): Path<u64>) -> &'static str {
 
 async fn status_handler(Path(code): Path<u16>) -> StatusCode {
     StatusCode::from_u16(code).unwrap_or(StatusCode::BAD_REQUEST)
+}
+
+async fn body_handler(Path(size): Path<usize>) -> String {
+    "x".repeat(size)
 }
 
 // Flaky server state
