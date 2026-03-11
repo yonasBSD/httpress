@@ -41,6 +41,7 @@ pub mod config;
 pub mod error;
 pub mod executor;
 pub mod metrics;
+pub mod progress;
 
 // Re-export main types for library users
 pub use benchmark::{Benchmark, BenchmarkBuilder};
@@ -51,3 +52,4 @@ pub use config::{
 };
 pub use error::{Error, Result};
 pub use metrics::BenchmarkResults;
+pub use progress::{ProgressFn, ProgressSnapshot};
