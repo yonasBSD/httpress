@@ -8,7 +8,7 @@
 
 A fast, flexible HTTP benchmarking library and CLI tool built in Rust.
 
-[Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [Library Usage](#library-usage) • [CLI Usage](#cli-usage) • [Examples](#examples)
+[Features](#features) • [Performance](#performance) • [Installation](#installation) • [Quick Start](#quick-start) • [Library Usage](#library-usage) • [CLI Usage](#cli-usage) • [Examples](#examples)
 
 </div>
 
@@ -24,6 +24,59 @@ A fast, flexible HTTP benchmarking library and CLI tool built in Rust.
 - **Adaptive Testing** - Duration-based or request-count-based
 - **Retry Logic** - Smart retry with hook-based control
 - **Library + CLI** - Use as Rust library or standalone tool
+
+## Performance
+
+Benchmarks run against a local [hyper](https://hyper.rs/) echo server on loopback (`localhost`).
+All tests use a 10 s duration. Environment: Intel Core i5-8350U, Arch Linux x86_64.
+
+### Scaling with concurrency
+
+| Concurrency | Throughput     | p50     | p99     |
+|-------------|----------------|---------|---------|
+| 5           | 17,315 req/s   | 0.25 ms | 0.57 ms |
+| 10          | 20,909 req/s   | 0.39 ms | 1.10 ms |
+| 25          | 29,071 req/s   | 0.70 ms | 1.64 ms |
+| 50          | 32,000 req/s   | 1.25 ms | 2.90 ms |
+| 100         | 32,502 req/s   | 2.42 ms | 6.03 ms |
+
+### Compared to other tools (concurrency=100, 10 s)
+
+| Tool     | Throughput     | p50     | p99     |
+|----------|----------------|---------|---------|
+| httpress | 32,502 req/s   | 2.42 ms | 6.03 ms |
+| wrk¹     | 39,135 req/s   | 2.47 ms | 5.42 ms |
+| hey      | 27,182 req/s   | 3.50 ms | 9.40 ms |
+
+¹ wrk uses 4 OS threads (`-t4 -c100`); httpress and hey each run in a single process.
+
+### Sample output
+
+```
+Target: http://localhost:3000 Get
+Concurrency: 100
+Stop condition: Duration(10s)
+
+Starting benchmark with 100 workers...
+
+--- Benchmark Complete ---
+Requests:     325107 total, 325107 success, 0 errors
+Duration:     10.00s
+Throughput:   32502.23 req/s
+Transferred:  0.62 MB
+
+Latency:
+  Min:    175us
+  Max:    45.12ms
+  Mean:   2.52ms
+  p50:    2.42ms
+  p90:    3.91ms
+  p95:    4.43ms
+  p99:    6.03ms
+
+Status codes:
+  200: 325107
+```
 
 ## Installation
 
@@ -146,24 +199,7 @@ httpress http://example.com/api -m POST \
 
 ### Example Output
 
-```
---- Benchmark Complete ---
-Requests:     1000 total, 1000 success, 0 errors
-Duration:     0.06s
-Throughput:   16185.07 req/s
-
-Latency:
-  Min:    245us
-  Max:    2.41ms
-  Mean:   612us
-  p50:    544us
-  p90:    955us
-  p95:    1.08ms
-  p99:    1.61ms
-
-Status codes:
-  200: 1000
-```
+See [Performance](#performance) for real benchmark output and concurrency-scaling numbers.
 
 ## Examples
 
