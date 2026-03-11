@@ -52,4 +52,3 @@ pub use config::{
 };
 pub use error::{Error, Result};
 pub use metrics::BenchmarkResults;
-pub use progress::{ProgressFn, ProgressSnapshot};
