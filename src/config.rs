@@ -39,8 +39,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 
+use indicatif::ProgressBar;
+
 use crate::cli::Args;
 use crate::error::Error;
+use crate::progress::{ProgressFn, create_progress_bar, update_progress_bar};
 
 /// Defines when the benchmark should stop
 #[derive(Debug, Clone)]
@@ -493,6 +496,7 @@ pub struct BenchConfig {
     pub before_request_hooks: Vec<BeforeRequestHook>,
     pub after_request_hooks: Vec<AfterRequestHook>,
     pub max_retries: usize,
+    pub progress_fn: Option<ProgressFn>,
 }
 
 impl BenchConfig {
@@ -524,7 +528,17 @@ impl BenchConfig {
             before_request_hooks: Vec::new(),
             after_request_hooks: Vec::new(),
             max_retries: 3,
+            progress_fn: None,
         })
+    }
+
+    /// Attach a built-in terminal progress bar and return the updated config
+    /// alongside the bar handle (used to call `finish_and_clear` after the run).
+    pub fn with_progress(mut self) -> (Self, Arc<ProgressBar>) {
+        let pb = Arc::new(create_progress_bar(&self.stop_condition));
+        let pb_fn = Arc::clone(&pb);
+        self.progress_fn = Some(Arc::new(move |snap| update_progress_bar(&pb_fn, &snap)));
+        (self, pb)
     }
 }
 
