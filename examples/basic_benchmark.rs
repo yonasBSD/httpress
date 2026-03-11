@@ -8,6 +8,7 @@ async fn main() -> Result<()> {
         .url("http://localhost:3000")
         .concurrency(50)
         .duration(Duration::from_secs(10))
+        .show_progress(true)
         .build()?
         .run()
         .await?;
