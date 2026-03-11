@@ -42,6 +42,7 @@ async fn main() -> httpress::Result<()> {
         })
         .concurrency(10)
         .requests(100)
+        .show_progress(true)
         .build()?
         .run()
         .await?;

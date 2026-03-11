@@ -24,6 +24,7 @@ async fn main() -> Result<()> {
         .url("http://localhost:3000")
         .concurrency(10)
         .requests(100)
+        .show_progress(true)
         .after_request(move |ctx| {
             let mut m = metrics_clone.lock().unwrap();
 

@@ -12,6 +12,7 @@ async fn main() -> httpress::Result<()> {
         .url("http://localhost:3000")
         .concurrency(50)
         .duration(Duration::from_secs(10))
+        .show_progress(true)
         .rate_fn(|ctx: RateContext| {
             // Linear ramp from 100 to 1000 req/s over 10 seconds
             let target_duration = 10.0;
@@ -27,7 +28,6 @@ async fn main() -> httpress::Result<()> {
         .run()
         .await?;
 
-    println!("\n");
     results.print();
 
     Ok(())
