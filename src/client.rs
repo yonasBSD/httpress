@@ -20,6 +20,7 @@ impl HttpClient {
     /// Create a new HTTP client with the given timeout and connection pool settings
     pub fn new(timeout: Duration, concurrency: usize) -> Result<Self> {
         let mut connector = hyper_util::client::legacy::connect::HttpConnector::new();
+        connector.enforce_http(false);
         connector.set_nodelay(true);
         connector.set_keepalive(Some(Duration::from_secs(60)));
 
