@@ -12,6 +12,10 @@ A fast, flexible HTTP benchmarking library and CLI tool built in Rust.
 
 </div>
 
+## Demo
+
+![demo](/assets/demo.gif)
+
 ## Features
 
 - **Simple Builder API** - Fluent, type-safe configuration
