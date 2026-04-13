@@ -127,6 +127,10 @@ pub struct BenchmarkResults {
 
     /// Total bytes received across all responses.
     pub total_bytes: u64,
+
+    /// Raw latency data for histogram computation (not serialized).
+    #[serde(skip)]
+    latencies: Vec<Duration>,
 }
 
 impl BenchmarkResults {
@@ -204,6 +208,94 @@ impl BenchmarkResults {
             }
         }
     }
+
+    /// Print ASCII histogram of latency distribution to stdout.
+    ///
+    /// Uses default buckets and displays a bar chart using block characters (█).
+    /// The bar length is scaled relative to the maximum count in any bucket.
+    ///
+    /// # Example Output
+    ///
+    /// ```text
+    /// Latency distribution:
+    ///   0-1ms    ████████████████████  150
+    ///   1-5ms    ████████████████      120
+    ///   5-10ms   ████████              60
+    ///   10-25ms  ████                  30
+    ///   25-50ms  █                     8
+    ///   50-100ms                        2
+    ///   100-250ms                       1
+    ///   250-500ms                       0
+    ///   500-1000ms                      0
+    ///   1000ms+                         0
+    /// ```
+    pub fn print_histogram(&self) {
+        if self.latencies.is_empty() {
+            return;
+        }
+
+        let buckets: Vec<Duration> = DEFAULT_BUCKETS_MS
+            .iter()
+            .map(|&ms| Duration::from_millis(ms))
+            .collect();
+
+        let histogram = self.compute_histogram(&buckets);
+
+        if histogram.is_empty() {
+            return;
+        }
+
+        // Find maximum count for scaling
+        let max_count = histogram.iter().map(|(_, count)| *count).max().unwrap_or(0);
+
+        println!("\nLatency distribution:");
+
+        for (label, count) in histogram {
+            let bar_length = if max_count > 0 {
+                (count as f64 / max_count as f64 * MAX_BAR_WIDTH as f64) as usize
+            } else {
+                0
+            };
+
+            let bar = "█".repeat(bar_length);
+            println!("  {:<10} {:<40} {}", label, bar, count);
+        }
+    }
+
+    /// Compute histogram of latencies falling into specified buckets.
+    fn compute_histogram(&self, buckets: &[Duration]) -> Vec<(String, u64)> {
+        let mut counts = vec![0u64; buckets.len() + 1];
+
+        for latency in &self.latencies {
+            let latency_ms = latency.as_millis() as u64;
+            let mut bucket_idx = buckets.len(); // Default to last bucket (overflow)
+
+            for (i, bucket) in buckets.iter().enumerate() {
+                let bucket_ms = bucket.as_millis() as u64;
+                if latency_ms <= bucket_ms {
+                    bucket_idx = i;
+                    break;
+                }
+            }
+            counts[bucket_idx] += 1;
+        }
+
+        // Create labels for each bucket
+        let mut result = Vec::with_capacity(buckets.len() + 1);
+        let mut prev_ms = 0u64;
+
+        for (i, bucket) in buckets.iter().enumerate() {
+            let bucket_ms = bucket.as_millis() as u64;
+            let label = format!("{}-{}ms", prev_ms, bucket_ms);
+            result.push((label, counts[i]));
+            prev_ms = bucket_ms;
+        }
+
+        // Add final overflow bucket
+        result.push((format!("{}ms+", prev_ms), counts[buckets.len()]));
+
+        result
+    }
 }
 
 /// Aggregated metrics from all requests
@@ -214,6 +306,13 @@ pub struct Metrics {
     pub status_codes: HashMap<u16, usize>,
     pub total_bytes: u64,
 }
+
+/// Maximum width for histogram bars in ASCII display
+const MAX_BAR_WIDTH: usize = 40;
+
+/// Default latency buckets for histogram (in milliseconds)
+/// Buckets: [0-1ms, 1-5ms, 5-10ms, 10-25ms, 25-50ms, 50-100ms, 100-250ms, 250-500ms, 500ms-1s, 1s+]
+const DEFAULT_BUCKETS_MS: &[u64] = &[1, 5, 10, 25, 50, 100, 250, 500, 1000];
 
 impl Metrics {
     pub fn new() -> Self {
@@ -303,6 +402,7 @@ impl Metrics {
             latency_p99,
             status_codes: self.status_codes,
             total_bytes: self.total_bytes,
+            latencies: self.latencies,
         }
     }
 }
