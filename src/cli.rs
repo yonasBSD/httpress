@@ -2,7 +2,6 @@ use crate::config::{HttpMethod, OutputFormat};
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 
-
 /// An API benchmark tool built with rust
 #[derive(Parser)]
 #[command(name = "httpress")]
